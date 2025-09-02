@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Route Tracker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        #map {
+            height: 600px;
+            width: 100%;
+            border-radius: 12px;
+            border: 2px solid #4a5568;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+    <!-- Leaflet CSS and JS for the map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="bg-gray-900 text-white p-4 sm:p-8">
+
+    <div class="container flex flex-col items-center justify-center min-h-screen">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-blue-400 mb-2">Flight Route Tracker</h1>
+            <p class="text-lg text-gray-400">View real-time flight paths on an interactive map.</p>
+        </header>
+
+        <!-- Search and Info Section -->
+        <div class="w-full max-w-2xl bg-gray-800 p-6 rounded-2xl shadow-lg mb-8">
+            <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                <input id="flight-number" type="text" placeholder="Enter Flight Number (e.g., UA123)"
+                       class="flex-1 w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 border border-transparent focus:border-blue-500 focus:outline-none transition-colors">
+                <button id="search-btn"
+                        class="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">
+                    Track Flight
+                </button>
+            </div>
+            <div id="status-message" class="mt-4 text-center text-gray-300">
+                <p>Loading flight data from your Spring Boot app...</p>
+            </div>
+        </div>
+
+        <!-- Map Container -->
+        <div id="map"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const mapElement = document.getElementById('map');
+            const statusMessage = document.getElementById('status-message');
+
+            // Initialize the map with a default view
+            const map = L.map(mapElement, {
+                zoomControl: false // Disable default zoom control to customize later if needed
+            }).setView([23.0225, 72.5714], 5); // Default center on Ahmedabad
+
+            // Add tile layer (the map's visual background) from Stadia Maps for English labels
+            L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            /**
+             * Fetches flight route data from the Spring Boot backend and draws the path on the map.
+             */
+            const fetchAndDrawRoute = async () => {
+                statusMessage.innerHTML = `<p>Fetching data...</p>`;
+                const API_URL = 'http://localhost:8080/flight-route';
+
+                try {
+                    // Fetch data from your Spring Boot API
+                    const response = await fetch(API_URL);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    const routeData = await response.json();
+                    
+                    if (routeData.path && routeData.path.length > 0) {
+                        const coordinates = routeData.path.map(point => [point.lat, point.lng]);
+                        
+                        // Create a polyline with the coordinates
+                        const polyline = L.polyline(coordinates, {
+                            color: '#60a5fa', // A nice blue color
+                            weight: 4,
+                            opacity: 0.8
+                        }).addTo(map);
+                        
+                        // Fit the map view to the bounds of the polyline
+                        map.fitBounds(polyline.getBounds());
+                        
+                        // Add markers for the start and end points
+                        L.marker(coordinates[0]).addTo(map).bindPopup(`<b>${routeData.from}</b>`).openPopup();
+                        L.marker(coordinates[coordinates.length - 1]).addTo(map).bindPopup(`<b>${routeData.to}</b>`);
+                        
+                        statusMessage.innerHTML = `<p>Route loaded for: ${routeData.from} to ${routeData.to}</p>`;
+                    } else {
+                        statusMessage.innerHTML = `<p>No flight route data found.</p>`;
+                    }
+
+                } catch (error) {
+                    console.error('Error fetching flight data:', error);
+                    statusMessage.innerHTML = `<p class="text-red-400">Error: Could not connect to the backend. Please ensure your Spring Boot app is running.</p>`;
+                }
+            };
+
+            // Call the function to fetch data when the page loads
+            fetchAndDrawRoute();
+        });
+    </script>
+</body>
+</html>
