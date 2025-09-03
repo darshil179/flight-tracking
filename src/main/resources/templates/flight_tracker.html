@@ -24,8 +24,8 @@
         }
     </style>
     <!-- Leaflet CSS and JS for the map -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 </head>
 <body class="bg-gray-900 text-white p-4 sm:p-8">
 
@@ -58,23 +58,47 @@
         document.addEventListener('DOMContentLoaded', () => {
             const mapElement = document.getElementById('map');
             const statusMessage = document.getElementById('status-message');
+            const searchButton = document.getElementById('search-btn');
+            const flightNumberInput = document.getElementById('flight-number');
+
+            let map;
 
             // Initialize the map with a default view
-            const map = L.map(mapElement, {
-                zoomControl: false // Disable default zoom control to customize later if needed
-            }).setView([23.0225, 72.5714], 5); // Default center on Ahmedabad
+            const initMap = () => {
+                 map = L.map(mapElement, {
+                    zoomControl: false 
+                }).setView([23.0225, 72.5714], 5); 
 
-            // Add tile layer (the map's visual background) from Stadia Maps for English labels
-            L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+            }
+
+            // Remove all existing layers from the map (e.g., previous flight paths)
+            const clearMap = () => {
+                if (map) {
+                    map.eachLayer(layer => {
+                        if (layer instanceof L.Polyline || layer instanceof L.Marker) {
+                            map.removeLayer(layer);
+                        }
+                    });
+                }
+                 // Add back the base tile layer
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+            };
 
             /**
              * Fetches flight route data from the Spring Boot backend and draws the path on the map.
+             * @param {string} flightNumber The flight number to track.
              */
-            const fetchAndDrawRoute = async () => {
+            const fetchAndDrawRoute = async (flightNumber = '') => {
+                clearMap();
                 statusMessage.innerHTML = `<p>Fetching data...</p>`;
-                const API_URL = 'http://localhost:8080/flight-route';
+                
+                // Construct the URL with the flight number query parameter
+                const API_URL = `http://localhost:8080/flight-route?flightNumber=${flightNumber}`;
 
                 try {
                     // Fetch data from your Spring Boot API
@@ -103,7 +127,7 @@
                         
                         statusMessage.innerHTML = `<p>Route loaded for: ${routeData.from} to ${routeData.to}</p>`;
                     } else {
-                        statusMessage.innerHTML = `<p>No flight route data found.</p>`;
+                        statusMessage.innerHTML = `<p>No flight route data found for flight number: ${flightNumber}.</p>`;
                     }
 
                 } catch (error) {
@@ -112,8 +136,14 @@
                 }
             };
 
-            // Call the function to fetch data when the page loads
-            fetchAndDrawRoute();
+            // Initialize the map on page load
+            initMap();
+
+            // Add an event listener to the search button
+            searchButton.addEventListener('click', () => {
+                const flightNumber = flightNumberInput.value.trim();
+                fetchAndDrawRoute(flightNumber);
+            });
         });
     </script>
 </body>
