@@ -51,12 +51,19 @@ public class AviationStackService {
                 .queryParam("access_key", apiKey)
                 .queryParam("flight_icao", flightIcaoNumber)
                 .toUriString();
+        
+        // Log the API URL to see what is being called
+        System.out.println("Calling API URL: " + apiUrl);
 
         RestTemplate restTemplate = new RestTemplate();
         ObjectMapper objectMapper = new ObjectMapper();
 
         try {
             String jsonResponse = restTemplate.getForObject(apiUrl, String.class);
+            
+            // Log the full JSON response to see what data is returned
+            System.out.println("Received API response: " + jsonResponse);
+            
             JsonNode root = objectMapper.readTree(jsonResponse);
             
             // Defensive programming: Check if the 'data' array exists and is not empty.

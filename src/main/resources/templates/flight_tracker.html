@@ -24,29 +24,29 @@
         }
     </style>
     <!-- Leaflet CSS and JS for the map -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
 <body class="bg-gray-900 text-white p-4 sm:p-8">
 
     <div class="container flex flex-col items-center justify-center min-h-screen">
         <header class="text-center mb-10">
             <h1 class="text-4xl sm:text-5xl font-extrabold text-blue-400 mb-2">Flight Route Tracker</h1>
-            <p class="text-lg text-gray-400">View real-time flight paths on an interactive map.</p>
+            <p class="text-lg text-gray-400">Enter a flight number to view its route.</p>
         </header>
 
         <!-- Search and Info Section -->
         <div class="w-full max-w-2xl bg-gray-800 p-6 rounded-2xl shadow-lg mb-8">
             <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
-                <input id="flight-number" type="text" placeholder="Enter Flight Number (e.g., UA123)"
+                <input id="flight-number-input" type="text" placeholder="Enter Flight Number (e.g., AI101)"
                        class="flex-1 w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 border border-transparent focus:border-blue-500 focus:outline-none transition-colors">
-                <button id="search-btn"
+                <button id="search-button"
                         class="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">
-                    Track Flight
+                    Search Flight
                 </button>
             </div>
             <div id="status-message" class="mt-4 text-center text-gray-300">
-                <p>Loading flight data from your Spring Boot app...</p>
+                <p>Try searching for **AI101**, **BA249**, or **SQ321** to see an example.</p>
             </div>
         </div>
 
@@ -58,92 +58,87 @@
         document.addEventListener('DOMContentLoaded', () => {
             const mapElement = document.getElementById('map');
             const statusMessage = document.getElementById('status-message');
-            const searchButton = document.getElementById('search-btn');
-            const flightNumberInput = document.getElementById('flight-number');
-
-            let map;
+            const searchButton = document.getElementById('search-button');
+            const flightNumberInput = document.getElementById('flight-number-input');
+            let map = null;
+            let flightPathLayer = null;
 
             // Initialize the map with a default view
-            const initMap = () => {
-                 map = L.map(mapElement, {
-                    zoomControl: false 
-                }).setView([23.0225, 72.5714], 5); 
-
+            function initializeMap() {
+                if (map) {
+                    map.remove();
+                }
+                map = L.map(mapElement).setView([20, 0], 2); // Center on the world
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }).addTo(map);
             }
 
-            // Remove all existing layers from the map (e.g., previous flight paths)
-            const clearMap = () => {
-                if (map) {
-                    map.eachLayer(layer => {
-                        if (layer instanceof L.Polyline || layer instanceof L.Marker) {
-                            map.removeLayer(layer);
-                        }
-                    });
-                }
-                 // Add back the base tile layer
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                }).addTo(map);
-            };
-
-            /**
-             * Fetches flight route data from the Spring Boot backend and draws the path on the map.
-             * @param {string} flightNumber The flight number to track.
-             */
-            const fetchAndDrawRoute = async (flightNumber = '') => {
-                clearMap();
-                statusMessage.innerHTML = `<p>Fetching data...</p>`;
-                
-                // Construct the URL with the flight number query parameter
-                const API_URL = `http://localhost:8080/flight-route?flightNumber=${flightNumber}`;
-
+            // Function to fetch and display flight data
+            async function fetchFlightData(flightNumber) {
+                statusMessage.innerHTML = `<p>Fetching data for flight **${flightNumber.toUpperCase()}**...</p>`;
                 try {
-                    // Fetch data from your Spring Boot API
-                    const response = await fetch(API_URL);
+                    const response = await fetch(`/flight-route?flightNumber=${flightNumber}`);
                     if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
+                        if (response.status === 404) {
+                            statusMessage.innerHTML = `<p class="text-red-400">Error: Flight number **${flightNumber.toUpperCase()}** not found.</p>`;
+                            if (flightPathLayer) flightPathLayer.remove();
+                            return;
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     const routeData = await response.json();
                     
-                    if (routeData.path && routeData.path.length > 0) {
-                        const coordinates = routeData.path.map(point => [point.lat, point.lng]);
-                        
-                        // Create a polyline with the coordinates
-                        const polyline = L.polyline(coordinates, {
-                            color: '#60a5fa', // A nice blue color
-                            weight: 4,
-                            opacity: 0.8
-                        }).addTo(map);
-                        
-                        // Fit the map view to the bounds of the polyline
-                        map.fitBounds(polyline.getBounds());
-                        
-                        // Add markers for the start and end points
-                        L.marker(coordinates[0]).addTo(map).bindPopup(`<b>${routeData.from}</b>`).openPopup();
-                        L.marker(coordinates[coordinates.length - 1]).addTo(map).bindPopup(`<b>${routeData.to}</b>`);
-                        
-                        statusMessage.innerHTML = `<p>Route loaded for: ${routeData.from} to ${routeData.to}</p>`;
-                    } else {
-                        statusMessage.innerHTML = `<p>No flight route data found for flight number: ${flightNumber}.</p>`;
-                    }
+                    if (routeData.data && routeData.data.length > 0) {
+                        const flightInfo = routeData.data[0];
+                        const fromAirport = flightInfo.departure.airport;
+                        const toAirport = flightInfo.arrival.airport;
 
+                        // Check if live data exists
+                        if (flightInfo.live) {
+                            const liveLat = flightInfo.live.latitude;
+                            const liveLng = flightInfo.live.longitude;
+                            
+                            // Remove previous flight path if it exists
+                            if (flightPathLayer) {
+                                map.removeLayer(flightPathLayer);
+                            }
+                            
+                            // Create and add the new polyline
+                            // NOTE: The current API response doesn't provide a full path, just a single live point.
+                            // We will just draw a marker at the live position for now.
+                            flightPathLayer = L.marker([liveLat, liveLng]).addTo(map).bindPopup(`<b>Live Position</b>`).openPopup();
+                            
+                            // Adjust the map view to fit the entire route
+                            map.setView([liveLat, liveLng], 5);
+                            
+                            statusMessage.innerHTML = `<p>Live position for flight **${flightInfo.flight.icao}** loaded. From **${fromAirport}** to **${toAirport}**</p>`;
+
+                        } else {
+                            statusMessage.innerHTML = `<p>No live flight data found for this code. From **${fromAirport}** to **${toAirport}**</p>`;
+                            if (flightPathLayer) flightPathLayer.remove();
+                        }
+                    } else {
+                        statusMessage.innerHTML = `<p>No flight route data found for this code.</p>`;
+                        if (flightPathLayer) flightPathLayer.remove();
+                    }
                 } catch (error) {
                     console.error('Error fetching flight data:', error);
-                    statusMessage.innerHTML = `<p class="text-red-400">Error: Could not connect to the backend. Please ensure your Spring Boot app is running.</p>`;
+                    statusMessage.innerHTML = `<p class="text-red-400">Error: Could not retrieve flight data.</p>`;
                 }
-            };
-
-            // Initialize the map on page load
-            initMap();
-
-            // Add an event listener to the search button
+            }
+            
+            // Add event listener for the search button
             searchButton.addEventListener('click', () => {
                 const flightNumber = flightNumberInput.value.trim();
-                fetchAndDrawRoute(flightNumber);
+                if (flightNumber) {
+                    fetchFlightData(flightNumber);
+                } else {
+                    statusMessage.innerHTML = `<p class="text-red-400">Please enter a flight number.</p>`;
+                }
             });
+
+            initializeMap();
         });
     </script>
 </body>
