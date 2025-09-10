@@ -3,143 +3,337 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flight Route Tracker</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Flight Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #1a202c; /* Dark background */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
         }
-        .container {
-            max-width: 1200px;
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header h1 {
+            text-align: center;
+            color: #4a5568;
+            font-weight: 700;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        input[type="text"] {
+            padding: 0.75rem 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            min-width: 200px;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #2dd4bf 0%, #06b6d4 100%);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 1rem;
+            padding: 1rem;
+            max-width: 1400px;
             margin: 0 auto;
+            min-height: calc(100vh - 120px);
         }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            height: fit-content;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .sidebar h3 {
+            color: #4a5568;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+        }
+
+        .flight-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .flight-item {
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 10px;
+            padding: 1rem;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .flight-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .flight-number {
+            font-weight: 700;
+            color: #4a5568;
+            font-size: 1.1rem;
+        }
+
+        .flight-details {
+            margin-top: 0.5rem;
+            color: #718096;
+            font-size: 0.9rem;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        .status.active {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status.scheduled {
+            background: #feebc8;
+            color: #c05621;
+        }
+
+        .status.landed {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .map-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
         #map {
-            height: 600px;
+            height: 80vh;
             width: 100%;
-            border-radius: 12px;
-            border: 2px solid #4a5568;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+            color: #667eea;
+            font-size: 1.1rem;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .flight-icon {
+            font-size: 1.5rem;
+            color: #667eea;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            input[type="text"] {
+                min-width: 250px;
+            }
         }
     </style>
-    <!-- Leaflet CSS and JS for the map -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
-<body class="bg-gray-900 text-white p-4 sm:p-8">
-
-    <div class="container flex flex-col items-center justify-center min-h-screen">
-        <header class="text-center mb-10">
-            <h1 class="text-4xl sm:text-5xl font-extrabold text-blue-400 mb-2">Flight Route Tracker</h1>
-            <p class="text-lg text-gray-400">Enter a flight number to view its route.</p>
-        </header>
-
-        <!-- Search and Info Section -->
-        <div class="w-full max-w-2xl bg-gray-800 p-6 rounded-2xl shadow-lg mb-8">
-            <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
-                <input id="flight-number-input" type="text" placeholder="Enter Flight Number (e.g., AI101)"
-                       class="flex-1 w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 border border-transparent focus:border-blue-500 focus:outline-none transition-colors">
-                <button id="search-button"
-                        class="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">
-                    Search Flight
+<body>
+    <div class="header">
+        <h1><i class="fas fa-plane"></i> Flight Tracker</h1>
+        <div class="controls">
+            <div class="input-group">
+                <input type="text" id="flightNumber" placeholder="Enter flight number (e.g., AA123)" maxlength="10">
+                <button class="btn btn-primary" onclick="addFlight()">
+                    <i class="fas fa-plus"></i> Track Flight
                 </button>
             </div>
-            <div id="status-message" class="mt-4 text-center text-gray-300">
-                <p>Try searching for **AI101**, **BA249**, or **SQ321** to see an example.</p>
+            <button class="btn btn-secondary" onclick="refreshFlights()">
+                <i class="fas fa-sync-alt"></i> Refresh All
+            </button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <h3><i class="fas fa-list"></i> Tracked Flights</h3>
+            <div class="loading" id="loading">
+                <i class="fas fa-spinner fa-spin"></i> Loading flights...
+            </div>
+            <div class="flight-list" id="flightList">
+                <!-- Flight items will be populated here -->
             </div>
         </div>
 
-        <!-- Map Container -->
-        <div id="map"></div>
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
     </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const mapElement = document.getElementById('map');
-            const statusMessage = document.getElementById('status-message');
-            const searchButton = document.getElementById('search-button');
-            const flightNumberInput = document.getElementById('flight-number-input');
-            let map = null;
-            let flightPathLayer = null;
+        // Global variables
+        let map;
+        let flightMarkers = {};
+        const API_BASE = 'http://localhost:8080/api/flights';
 
-            // Initialize the map with a default view
-            function initializeMap() {
-                if (map) {
-                    map.remove();
-                }
-                map = L.map(mapElement).setView([20, 0], 2); // Center on the world
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                }).addTo(map);
-            }
-
-            // Function to fetch and display flight data
-            async function fetchFlightData(flightNumber) {
-                statusMessage.innerHTML = `<p>Fetching data for flight **${flightNumber.toUpperCase()}**...</p>`;
-                try {
-                    const response = await fetch(`/flight-route?flightNumber=${flightNumber}`);
-                    if (!response.ok) {
-                        if (response.status === 404) {
-                            statusMessage.innerHTML = `<p class="text-red-400">Error: Flight number **${flightNumber.toUpperCase()}** not found.</p>`;
-                            if (flightPathLayer) flightPathLayer.remove();
-                            return;
-                        }
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const routeData = await response.json();
-                    
-                    if (routeData.data && routeData.data.length > 0) {
-                        const flightInfo = routeData.data[0];
-                        const fromAirport = flightInfo.departure.airport;
-                        const toAirport = flightInfo.arrival.airport;
-
-                        // Check if live data exists
-                        if (flightInfo.live) {
-                            const liveLat = flightInfo.live.latitude;
-                            const liveLng = flightInfo.live.longitude;
-                            
-                            // Remove previous flight path if it exists
-                            if (flightPathLayer) {
-                                map.removeLayer(flightPathLayer);
-                            }
-                            
-                            // Create and add the new polyline
-                            // NOTE: The current API response doesn't provide a full path, just a single live point.
-                            // We will just draw a marker at the live position for now.
-                            flightPathLayer = L.marker([liveLat, liveLng]).addTo(map).bindPopup(`<b>Live Position</b>`).openPopup();
-                            
-                            // Adjust the map view to fit the entire route
-                            map.setView([liveLat, liveLng], 5);
-                            
-                            statusMessage.innerHTML = `<p>Live position for flight **${flightInfo.flight.icao}** loaded. From **${fromAirport}** to **${toAirport}**</p>`;
-
-                        } else {
-                            statusMessage.innerHTML = `<p>No live flight data found for this code. From **${fromAirport}** to **${toAirport}**</p>`;
-                            if (flightPathLayer) flightPathLayer.remove();
-                        }
-                    } else {
-                        statusMessage.innerHTML = `<p>No flight route data found for this code.</p>`;
-                        if (flightPathLayer) flightPathLayer.remove();
-                    }
-                } catch (error) {
-                    console.error('Error fetching flight data:', error);
-                    statusMessage.innerHTML = `<p class="text-red-400">Error: Could not retrieve flight data.</p>`;
-                }
-            }
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([40.7128, -74.0060], 4); // Center on NYC
             
-            // Add event listener for the search button
-            searchButton.addEventListener('click', () => {
-                const flightNumber = flightNumberInput.value.trim();
-                if (flightNumber) {
-                    fetchFlightData(flightNumber);
-                } else {
-                    statusMessage.innerHTML = `<p class="text-red-400">Please enter a flight number.</p>`;
-                }
-            });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
 
-            initializeMap();
-        });
-    </script>
-</body>
-</html>
+        // Create custom airplane icon
+        function createFlightIcon(status) {
+            const colors = {
+                active: '#22543d',
+                scheduled: '#c05621',
+                landed: '#4a5568',
+                default: '#667eea'
+            };
+            
+            return L.divIcon({
+                html: `<i class="fas fa-plane" style="color: ${colors[status] || colors.default}; font-size: 20px;"></i>`,
+                iconSize: [30, 30],
+                className: 'flight-marker'
+            });
+        }
+
+        // Add flight to tracking
+        async function addFlight() {
+            const flightNumber = document.getElementById('flightNumber').value.trim();
+            if (!flightNumber) {
+                alert('Please enter a flight number');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                const response = await fetch(`${API_BASE}/add`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `flightNumber=${encodeURIComponent(flightNumber)}`
+                });
+
+                if (response.ok) {
+                    document.getElementById('flightNumber').value = '';
+                    await loadFlights();
+                    alert(`Flight ${flightNumber} added to tracking!`);
+                } else {
+                    const error = await response.text();
+                    alert(`Error: ${error}`);
+                }
+            } catch (error) {
+                console.error('Error adding flight:', error);
+                alert('Failed to add flight. Please try again.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Load all flights
+        async function loadFlights() {
+            try {
+                showLoading(true);
+                const response = await fetch(`${API_BASE}/all`);
+                const flights = await response.json();
+                
+                displayFlights(flights);
+                updateMap(flights);
+            } catch (error) {
+                console.error('Error loading flights:', error
